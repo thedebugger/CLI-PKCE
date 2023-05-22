@@ -8,6 +8,9 @@ import secrets
 import threading
 import urllib
 import webbrowser
+import logging
+import sys
+import json
 from time import sleep
 
 from werkzeug.serving import make_server
@@ -27,6 +30,9 @@ audience = os.getenv('AUTH0_AUDIENCE', "https://gateley-empire-life.auth0.com/ap
 scope = os.getenv('AUTH0_SCOPE',"profile openid email read:clients create:clients read:client_keys")
 
 app = Flask(__name__)
+# disable flask access logs
+log = logging.getLogger('werkzeug')
+log.disabled = True
 
 @app.route(callback_url)
 def callback():
@@ -60,7 +66,7 @@ class ServerThread(threading.Thread):
         self.ctx.push()
 
     def run(self):
-        print('starting server')
+        print('starting server', file=sys.stderr)
         self.srv.serve_forever()
 
     def shutdown(self):
@@ -93,7 +99,8 @@ url_parameters = {
     'client_id': client_id,
     'code_challenge': challenge.replace('=', ''),
     'code_challenge_method': 'S256',
-    'state': state
+    'state': state,
+    'connection_scope': 'https://www.googleapis.com/auth/gmail.readonly'
 }
 url = base_url + urllib.parse.urlencode(url_parameters)
 
@@ -129,10 +136,10 @@ body = {'grant_type': 'authorization_code',
 r = requests.post(url, headers=headers, data=json.dumps(body))
 r.raise_for_status()
 data = r.json()
+print(json.dumps(data))
 # Use the token to list the clients
 url = 'https://%s.us.auth0.com/userinfo' % tenant
 headers = {'Authorization': 'Bearer %s' % data['access_token']}
 r = requests.get(url, headers=headers)
 r.raise_for_status()
 data = r.json()
-print(data)
